@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kiwi+Maru:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <title>LocalStorageタスク管理アプリ</title>
+    <style>
+        :root {
+            --main_color: #aac74c;
+        }
+        body { 
+            font-family: "Kiwi Maru", serif;
+            background-color:rgba(249, 240, 225, 0.8);
+            color: #333;
+            padding: 20px;
+            position: relative;
+        }
+        h1 { 
+            text-align: center;
+            color: #444;
+        }
+        .task { 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border-radius: 8px; 
+            background-color: #ffffff;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .task h3 { 
+            margin: 0; 
+            font-size: 1.2em;
+        }
+        .tag { 
+            font-size: 12px; 
+            color: white; 
+            padding: 5px 10px; 
+            border-radius: 12px; 
+            background-color: var(--main_color); 
+            display: inline-block; 
+            margin-top: 5px;
+            margin-right: 1em;
+        }
+        .edit-tag { 
+            margin-top: 10px; 
+            padding: 5px;
+        }
+        .task-column { 
+            width: 400px; 
+            margin-right: 20px; 
+            flex-shrink: 0; 
+            background: rgba(255,255,255,0.4);
+            backdrop-filter: blur(30px);
+            border: solid 2px rgba(255,255,255,0.5);
+            border-radius: 15px; 
+            padding: 5px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .task-column h3 { 
+            background-color: #dae3af;
+            color: #333; 
+            padding: 10px; 
+            border-radius: 5px;
+            margin: -15px -15px 10px;
+        }
+        #tasksContainer { 
+            display: flex; 
+            overflow-x: auto; 
+            padding: 20px; 
+            gap: 20px;
+            min-height: calc(100vh - 180px);
+        }
+        #taskTitle, #taskDescription, #taskTag, button {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .delete-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            padding: 5px;
+        }
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+        .edit-description {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            resize: vertical;
+        }
+        .add-task-modal {
+            display: none;
+            position: fixed;
+            width: 60vw;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            z-index: 1000;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .add-task-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--main_color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 30px;
+            cursor: pointer;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 500;
+        }
+        .add-task-button:hover {
+            background-color: #0056b3;
+        }
+        #taskTitle {
+            width: 95%;
+        }
+        #taskDescription {
+            width: 95%;
+            min-height: 20vh;
+            resize: vertical;
+        }
+        .modal_bottom {
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="add-task-modal" id="addTaskModal">
+        <h3>新しいタスクを追加</h3>
+        <input type="text" id="taskTitle" placeholder="タスクタイトル"><br>
+        <textarea id="taskDescription" placeholder="タスクの説明"></textarea><br>
+        <div class="modal_bottom">
+            <select id="taskTag">
+                <option value="未着手">未着手</option>
+                <option value="仕様未確定">仕様未確定</option>
+                <option value="仕様検討中">仕様検討中</option>
+                <option value="作業中">作業中</option>
+                <option value="要確認">要確認</option>
+                <option value="動作検証中">動作検証中</option>
+                <option value="レビュー中">レビュー中</option>
+                <option value="完了">完了</option>
+            </select>
+            <div>
+                <button onclick="addTask()">タスクを追加</button>
+                <button onclick="closeModal()">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="add-task-button" onclick="openModal()">+</button>
+
+    <div id="tasksContainer"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTasks();
+            document.addEventListener('keydown', function(event) {
+                if (event.ctrlKey && event.key === 'Enter') {
+                    addTask();
+                }
+            });
+
+            adjusttextarea();
+        });
+
+        function adjusttextarea(){
+            var textareas = document.querySelectorAll('.edit-description');
+            textareas.forEach(function(textarea) {
+                textarea.style.height = 'auto';
+                textarea.style.height = textarea.scrollHeight + 'px';
+                textarea.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = this.scrollHeight + 'px';
+                });
+            });
+        }
+
+        function openModal() {
+            document.getElementById('addTaskModal').style.display = 'block';
+            document.getElementById('modalOverlay').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('addTaskModal').style.display = 'none';
+            document.getElementById('modalOverlay').style.display = 'none';
+        }
+
+        function addTask() {
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const tag = document.getElementById('taskTag').value;
+
+            if (!title) {
+                alert('タスクタイトルを入力してください。');
+                return;
+            }
+
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+            tasks.push({ title, description, tag });
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            loadTasks();
+
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDescription').value = '';
+            closeModal();
+            adjusttextarea();
+        }
+
+        function loadTasks() {
+            const tasksContainer = document.getElementById('tasksContainer');
+            tasksContainer.innerHTML = '';
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+            const allTags = [
+                "未着手", "仕様未確定", "仕様検討中", "作業中", "要確認", "動作検証中", "レビュー中", "完了"
+            ];
+
+            allTags.forEach(tag => {
+                const columnDiv = document.createElement('div');
+                columnDiv.className = 'task-column';
+
+                const tagTitle = document.createElement('h3');
+                tagTitle.textContent = tag;
+                columnDiv.appendChild(tagTitle);
+
+                const filteredTasks = tasks.filter((task, index) => {
+                    task.index = index;
+                    return task.tag === tag;
+                });
+
+                filteredTasks.forEach(task => {
+                    const taskDiv = document.createElement('div');
+                    taskDiv.className = 'task';
+                    
+                    const taskTitle = document.createElement('h3');
+                    taskTitle.textContent = task.title;
+                    taskDiv.appendChild(taskTitle);
+
+                    const taskDescription = document.createElement('textarea');
+                    taskDescription.className = 'edit-description';
+                    taskDescription.value = task.description;
+                    taskDescription.oninput = function() {
+                        updateTaskDescription(task.index, taskDescription.value);
+                    };
+                    taskDiv.appendChild(taskDescription);
+
+                    const taskTag = document.createElement('span');
+                    taskTag.className = 'tag';
+                    taskTag.textContent = task.tag;
+                    taskDiv.appendChild(taskTag);
+
+                    // タグ編集用のセレクトボックス
+                    const editTagSelect = document.createElement('select');
+                    editTagSelect.className = 'edit-tag';
+                    editTagSelect.innerHTML = `
+                        <option value="未着手">未着手</option>
+                        <option value="仕様未確定">仕様未確定</option>
+                        <option value="仕様検討中">仕様検討中</option>
+                        <option value="作業中">作業中</option>
+                        <option value="要確認">要確認</option>
+                        <option value="動作検証中">動作検証中</option>
+                        <option value="レビュー中">レビュー中</option>
+                        <option value="完了">完了</option>
+                    `;
+                    editTagSelect.value = task.tag;
+                    editTagSelect.onchange = function() {
+                        updateTaskTag(task.index, editTagSelect.value);
+                    };
+                    taskDiv.appendChild(editTagSelect);
+
+                    // 完了ボタン（削除ボタン）
+                    const deleteButton = document.createElement('button');
+                    deleteButton.className = 'delete-button';
+                    deleteButton.textContent = '完了';
+                    deleteButton.onclick = function() {
+                        deleteTask(task.index);
+                    };
+                    taskDiv.appendChild(deleteButton);
+
+                    columnDiv.appendChild(taskDiv);
+                });
+
+                tasksContainer.appendChild(columnDiv);
+            });
+        }
+
+        function updateTaskTag(index, newTag) {
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+            if (tasks[index]) {
+                tasks[index].tag = newTag;
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+                loadTasks();
+            }
+            adjusttextarea();
+        }
+
+        function updateTaskDescription(index, newDescription) {
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+            if (tasks[index]) {
+                tasks[index].description = newDescription;
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+            }
+        }
+
+        function deleteTask(index) {
+            let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+            if (index >= 0 && index < tasks.length) {
+                tasks.splice(index, 1);
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+                loadTasks();
+            }
+            adjusttextarea();
+        }
+    </script>
+</body>
+</html>
